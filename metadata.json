@@ -1,0 +1,7 @@
+{
+  "name": "Passport Photo Pro",
+  "description": "Transform any portrait into a professional, high-quality passport-sized photo with transparent backgrounds and straightened posture using advanced AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
