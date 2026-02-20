@@ -1,21 +1,48 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { ImageSize, GeminiResponse } from "../types";
+import { ImageSize, GeminiResponse, StyleOptions } from "../types";
 
 export const editPassportPhoto = async (
   base64Image: string,
-  size: ImageSize
+  size: ImageSize,
+  options: StyleOptions
 ): Promise<GeminiResponse> => {
-  // Create a fresh instance to ensure the latest API key is used
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Extract mime type and data from data URL
   const match = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
   if (!match) {
     throw new Error("Invalid image format");
   }
   const mimeType = match[1];
   const imageData = match[2];
+
+  // Map user-friendly labels to prompt descriptions
+  const colorMap = {
+    'sea-blue': 'a vibrant sea blue',
+    'navy': 'a deep navy blue',
+    'black': 'a classic solid black',
+    'charcoal': 'a professional charcoal grey'
+  };
+
+  const bgMap = {
+    'transparent': 'COMPLETELY REMOVE the background. The background MUST be 100% transparent (alpha = 0). DO NOT generate any "checkerboard", "grid", or "pixel box" pattern. If I see a grey/white grid, it is a total failure. The background should be empty.',
+    'white': 'replace the background with a solid, studio-standard white color.',
+    'light-grey': 'replace the background with a professional light grey gradient.',
+    'light-blue': 'replace the background with a standard passport-style light blue.'
+  };
+
+  // Construct dynamic enhancement instructions
+  let stylePrompt = "";
+  
+  if (options.attire === 'suit') {
+    stylePrompt += `- ATTIRE: Change the person's clothing to a high-end professional suit in ${colorMap[options.attireColor]}, paired with a crisp white formal shirt and a matching tie.\n`;
+  } else if (options.attire === 'shirt') {
+    stylePrompt += `- ATTIRE: Change the person's clothing to a crisp, well-pressed formal shirt in ${colorMap[options.attireColor]}.\n`;
+  }
+
+  if (options.addSmile) {
+    stylePrompt += `- EXPRESSION: Adjust the face to have a subtle, natural, and friendly smile while keeping eyes focused on the camera.\n`;
+  }
 
   try {
     const response = await ai.models.generateContent({
@@ -29,15 +56,16 @@ export const editPassportPhoto = async (
             },
           },
           {
-            text: `Please edit this portrait into a professional, high-quality passport photo. 
+            text: `Please transform this portrait into a professional, high-quality passport photo. 
             
-            Strict Requirements:
-            1. BACKGROUND: Completely remove the background and replace it with true alpha transparency. DO NOT use a checkerboard pattern or any placeholder texture. The resulting image MUST have a transparent alpha channel.
-            2. POSE: Straighten the person's posture and head alignment. They should be looking directly at the camera with eyes level.
-            3. QUALITY: Ensure the lighting is balanced, professional, and consistent across the face (studio quality).
-            4. CROP: Format the image to standard passport photo proportions (roughly 3:4 aspect ratio), centered on the face with appropriate headspace.
+            Strict Technical Requirements:
+            1. BACKGROUND: ${bgMap[options.outputBg]}
+            2. POSE: Straighten posture and head alignment perfectly. Ensure shoulders are level and the person is looking directly at the lens.
+            3. LIGHTING: Ensure soft, balanced studio lighting without harsh shadows.
+            4. CROP: Format to standard 3:4 passport proportions, focusing on head and shoulders.
+            ${stylePrompt}
             
-            The final result must be a clean PNG with a transparent background.`,
+            IMPORTANT: The result must be a clean PNG. If transparency is requested, the background must NOT contain any visible pixels, colors, or patterns like a transparency grid. It must be an actual alpha channel.`,
           },
         ],
       },
